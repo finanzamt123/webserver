@@ -4,25 +4,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sensor Dashboard</title>
+    <script>
+        // Funktion zum Abrufen der aktuellen Daten
+        async function fetchSensorData() {
+            try {
+                const response = await fetch('/data');
+                const data = await response.json();
+
+                // Sensordaten im HTML aktualisieren
+                document.getElementById('ec-value').textContent = data.ec.toFixed(2) + ' mS/cm';
+                document.getElementById('ph-value').textContent = data.ph.toFixed(2);
+                document.getElementById('temperature-value').textContent = data.temperature.toFixed(2) + ' °C';
+                document.getElementById('water-level-value').textContent = data.water_level.toFixed(2) + ' %';
+            } catch (error) {
+                console.error('Fehler beim Abrufen der Sensordaten:', error);
+            }
+        }
+
+        // Aktualisierung alle 5 Sekunden
+        setInterval(fetchSensorData, 5000);
+
+        // Daten beim Laden der Seite abrufen
+        window.onload = fetchSensorData;
+    </script>
 </head>
 <body>
     <h1>Sensor Dashboard</h1>
     <div>
-        <p>EC-Wert: {{ data.ec }} mS/cm</p>
-        <p>pH-Wert: {{ data.ph }}</p>
-        <p>Temperatur: {{ data.temperature }} °C</p>
-        <p>Wasserstand: {{ data.water_level }} %</p>
+        <p><strong>EC-Wert:</strong> <span id="ec-value">Laden...</span></p>
+        <p><strong>pH-Wert:</strong> <span id="ph-value">Laden...</span></p>
+        <p><strong>Temperatur:</strong> <span id="temperature-value">Laden...</span></p>
+        <p><strong>Wasserstand:</strong> <span id="water-level-value">Laden...</span></p>
     </div>
     <form method="POST" action="/update">
         <h2>Werte anpassen</h2>
         <label>EC-Wert:</label>
-        <input type="number" step="0.1" name="ec" value="{{ data.ec }}"><br>
+        <input type="number" step="0.1" name="ec" placeholder="Neuer EC-Wert"><br>
         <label>pH-Wert:</label>
-        <input type="number" step="0.1" name="ph" value="{{ data.ph }}"><br>
-        <label>Temperatur:</label>
-        <input type="number" step="0.1" name="temperature" value="{{ data.temperature }}"><br>
+        <input type="number" step="0.1" name="ph" placeholder="Neuer pH-Wert"><br>
         <label>Wasserstand:</label>
-        <input type="number" step="0.1" name="water_level" value="{{ data.water_level }}"><br>
+        <input type="number" step="0.1" name="water_level" placeholder="Neuer Wasserstand"><br>
         <button type="submit">Aktualisieren</button>
     </form>
 </body>
