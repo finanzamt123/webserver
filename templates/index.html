@@ -9,7 +9,8 @@
         button { background: #4CAF50; color: white; border: none; padding: 10px; cursor: pointer; }
         button:hover { background: #45a049; }
         .schedule-list { margin-top: 10px; }
-        .schedule-item { background: #e0e0e0; padding: 5px; margin: 5px; border-radius: 5px; }
+        .schedule-item { background: #e0e0e0; padding: 10px; margin: 5px; border-radius: 5px; }
+        .time-inputs { display: flex; gap: 10px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -35,41 +36,78 @@
     <div class="card">
         <h2>Bewässerungszeitplan</h2>
         <form id="scheduleForm" action="/set_schedule" method="post">
-            <input type="time" id="scheduleTime" name="schedule_time" required>
-            <button type="button" onclick="addSchedule()">Zeit hinzufügen</button>
+            <div class="time-inputs">
+                <input type="time" id="startTime" name="start_time" required>
+                <input type="time" id="endTime" name="end_time" required>
+                <button type="button" onclick="addSchedule()">Zeit hinzufügen</button>
+            </div>
             <div id="scheduleList" class="schedule-list">
-                {% for time in schedule %}
-                <div class="schedule-item">{{ time }}</div>
+                {% for entry in schedule %}
+                <div class="schedule-item">
+                    <span>{{ entry.start }} - {{ entry.end }}</span>
+                    <button type="button" onclick="removeSchedule('{{ entry.start }}', '{{ entry.end }}')">Löschen</button>
+                </div>
                 {% endfor %}
             </div>
-            <input type="hidden" id="scheduleTimes" name="schedule_times" value="{{ schedule|join(',') }}">
+            <input type="hidden" id="scheduleEntries" name="schedule_entries" value="{{ schedule|tojson|forceescape }}">
             <button type="submit">Zeitplan speichern</button>
         </form>
     </div>
 
     <script>
         function addSchedule() {
-            const timeInput = document.getElementById('scheduleTime');
+            const startTime = document.getElementById('startTime');
+            const endTime = document.getElementById('endTime');
             const scheduleList = document.getElementById('scheduleList');
-            const scheduleTimes = document.getElementById('scheduleTimes');
+            const scheduleEntries = document.getElementById('scheduleEntries');
 
-            if (timeInput.value) {
-                // Neue Zeit zur Liste hinzufügen
-                const newTime = document.createElement('div');
-                newTime.className = 'schedule-item';
-                newTime.textContent = timeInput.value;
-                scheduleList.appendChild(newTime);
+            if (startTime.value && endTime.value) {
+                // Neuen Eintrag erstellen
+                const newEntry = { start: startTime.value, end: endTime.value };
 
-                // Zeit zum versteckten Eingabefeld hinzufügen
-                if (scheduleTimes.value) {
-                    scheduleTimes.value += ',' + timeInput.value;
-                } else {
-                    scheduleTimes.value = timeInput.value;
+                // Eintrag zur Liste hinzufügen
+                const newItem = document.createElement('div');
+                newItem.className = 'schedule-item';
+                newItem.innerHTML = `
+                    <span>${newEntry.start} - ${newEntry.end}</span>
+                    <button type="button" onclick="removeSchedule('${newEntry.start}', '${newEntry.end}')">Löschen</button>
+                `;
+                scheduleList.appendChild(newItem);
+
+                // Eintrag zum versteckten Eingabefeld hinzufügen
+                let entries = [];
+                if (scheduleEntries.value) {
+                    entries = JSON.parse(scheduleEntries.value);
                 }
+                entries.push(newEntry);
+                scheduleEntries.value = JSON.stringify(entries);
 
-                // Eingabefeld leeren
-                timeInput.value = '';
+                // Eingabefelder leeren
+                startTime.value = '';
+                endTime.value = '';
             }
+        }
+
+        function removeSchedule(start, end) {
+            const scheduleEntries = document.getElementById('scheduleEntries');
+            let entries = JSON.parse(scheduleEntries.value);
+
+            // Eintrag entfernen
+            entries = entries.filter(entry => entry.start !== start || entry.end !== end);
+            scheduleEntries.value = JSON.stringify(entries);
+
+            // Liste neu aufbauen
+            const scheduleList = document.getElementById('scheduleList');
+            scheduleList.innerHTML = '';
+            entries.forEach(entry => {
+                const newItem = document.createElement('div');
+                newItem.className = 'schedule-item';
+                newItem.innerHTML = `
+                    <span>${entry.start} - ${entry.end}</span>
+                    <button type="button" onclick="removeSchedule('${entry.start}', '${entry.end}')">Löschen</button>
+                `;
+                scheduleList.appendChild(newItem);
+            });
         }
     </script>
 </body>
