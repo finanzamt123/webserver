@@ -19,8 +19,8 @@
     <!-- Aktuelle Sensordaten -->
     <div class="card">
         <h2>Aktuelle Daten</h2>
-        <p>Temperatur: {{ temp }} °C</p>
-        <p>EC-Wert: {{ ec }}</p>
+        <p>Temperatur: <span id="currentTemp">{{ temp }}</span> °C</p>
+        <p>EC-Wert: <span id="currentEC">{{ ec }}</span></p>
     </div>
 
     <!-- Ziel-EC einstellen -->
@@ -55,6 +55,7 @@
     </div>
 
     <script>
+        // Funktion zum Hinzufügen von Zeitintervallen
         function addSchedule() {
             const startTime = document.getElementById('startTime');
             const endTime = document.getElementById('endTime');
@@ -88,6 +89,7 @@
             }
         }
 
+        // Funktion zum Entfernen von Zeitintervallen
         function removeSchedule(start, end) {
             const scheduleEntries = document.getElementById('scheduleEntries');
             let entries = JSON.parse(scheduleEntries.value);
@@ -109,6 +111,19 @@
                 scheduleList.appendChild(newItem);
             });
         }
+
+        // Funktion zum Aktualisieren der Sensordaten
+        function updateSensorData() {
+            fetch("/get_sensor_data")
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("currentTemp").textContent = data.temp;
+                    document.getElementById("currentEC").textContent = data.ec;
+                });
+        }
+
+        // Sensordaten alle 5 Sekunden aktualisieren
+        setInterval(updateSensorData, 5000);
     </script>
 </body>
 </html>
