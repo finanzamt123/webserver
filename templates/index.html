@@ -1,23 +1,28 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nährstoffdosierer</title>
+    <title>Nährstoffdosierer Steuerung</title>
     <style>
-        body { font-family: Arial; margin: 20px; }
+        body { font-family: Arial, sans-serif; margin: 20px; }
         .card { background: #f0f0f0; padding: 20px; margin: 10px; border-radius: 10px; }
-        input[type="number"], input[type="time"] { padding: 5px; margin: 5px; }
+        input[type="time"] { padding: 5px; margin: 5px; }
         button { background: #4CAF50; color: white; border: none; padding: 10px; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .schedule-list { margin-top: 10px; }
+        .schedule-item { background: #e0e0e0; padding: 5px; margin: 5px; border-radius: 5px; }
     </style>
 </head>
 <body>
     <h1>Nährstoffdosierer Steuerung</h1>
-    
+
+    <!-- Aktuelle Sensordaten -->
     <div class="card">
         <h2>Aktuelle Daten</h2>
         <p>Temperatur: {{ temp }} °C</p>
         <p>EC-Wert: {{ ec }}</p>
     </div>
 
+    <!-- Ziel-EC einstellen -->
     <div class="card">
         <h2>Ziel-EC einstellen</h2>
         <form action="/set_ec" method="post">
@@ -26,12 +31,46 @@
         </form>
     </div>
 
+    <!-- Bewässerungszeitplan -->
     <div class="card">
         <h2>Bewässerungszeitplan</h2>
-        <form action="/set_schedule" method="post">
-            <input type="time" name="schedule_time" multiple>
-            <button type="submit">Zeitplan hinzufügen</button>
+        <form id="scheduleForm" action="/set_schedule" method="post">
+            <input type="time" id="scheduleTime" name="schedule_time" required>
+            <button type="button" onclick="addSchedule()">Zeit hinzufügen</button>
+            <div id="scheduleList" class="schedule-list">
+                {% for time in schedule %}
+                <div class="schedule-item">{{ time }}</div>
+                {% endfor %}
+            </div>
+            <input type="hidden" id="scheduleTimes" name="schedule_times" value="{{ schedule|join(',') }}">
+            <button type="submit">Zeitplan speichern</button>
         </form>
     </div>
+
+    <script>
+        function addSchedule() {
+            const timeInput = document.getElementById('scheduleTime');
+            const scheduleList = document.getElementById('scheduleList');
+            const scheduleTimes = document.getElementById('scheduleTimes');
+
+            if (timeInput.value) {
+                // Neue Zeit zur Liste hinzufügen
+                const newTime = document.createElement('div');
+                newTime.className = 'schedule-item';
+                newTime.textContent = timeInput.value;
+                scheduleList.appendChild(newTime);
+
+                // Zeit zum versteckten Eingabefeld hinzufügen
+                if (scheduleTimes.value) {
+                    scheduleTimes.value += ',' + timeInput.value;
+                } else {
+                    scheduleTimes.value = timeInput.value;
+                }
+
+                // Eingabefeld leeren
+                timeInput.value = '';
+            }
+        }
+    </script>
 </body>
 </html>
