@@ -1,129 +1,109 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nährstoffdosierer Steuerung</title>
+    <title>Nährstoffdosierer</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         .card { background: #f0f0f0; padding: 20px; margin: 10px; border-radius: 10px; }
-        input[type="time"] { padding: 5px; margin: 5px; }
         button { background: #4CAF50; color: white; border: none; padding: 10px; cursor: pointer; }
-        button:hover { background: #45a049; }
-        .schedule-list { margin-top: 10px; }
         .schedule-item { background: #e0e0e0; padding: 10px; margin: 5px; border-radius: 5px; }
-        .time-inputs { display: flex; gap: 10px; margin-bottom: 10px; }
+        .time-inputs { display: flex; gap: 10px; margin: 10px 0; }
     </style>
 </head>
 <body>
     <h1>Nährstoffdosierer Steuerung</h1>
 
-    <!-- Aktuelle Sensordaten -->
+    <!-- Sensordaten -->
     <div class="card">
         <h2>Aktuelle Daten</h2>
         <p>Temperatur: <span id="currentTemp">{{ temp }}</span> °C</p>
         <p>EC-Wert: <span id="currentEC">{{ ec }}</span></p>
     </div>
 
-    <!-- Ziel-EC einstellen -->
+    <!-- Ziel-EC -->
     <div class="card">
-        <h2>Ziel-EC einstellen</h2>
+        <h2>Ziel-EC</h2>
         <form action="/set_ec" method="post">
             <input type="number" step="0.1" name="target_ec" value="{{ target_ec }}">
             <button type="submit">Speichern</button>
         </form>
     </div>
 
-    <!-- Bewässerungszeitplan -->
+    <!-- Zeitplan -->
     <div class="card">
         <h2>Bewässerungszeitplan</h2>
         <form id="scheduleForm" action="/set_schedule" method="post">
             <div class="time-inputs">
-                <input type="time" id="startTime" name="start_time" required>
-                <input type="time" id="endTime" name="end_time" required>
-                <button type="button" onclick="addSchedule()">Zeit hinzufügen</button>
+                <input type="time" id="startTime" required>
+                <input type="time" id="endTime" required>
+                <button type="button" onclick="addSchedule()">Hinzufügen</button>
             </div>
-            <div id="scheduleList" class="schedule-list">
+            <div id="scheduleList">
                 {% for entry in schedule %}
                 <div class="schedule-item">
-                    <span>{{ entry.start }} - {{ entry.end }}</span>
+                    {{ entry.start }} - {{ entry.end }}
                     <button type="button" onclick="removeSchedule('{{ entry.start }}', '{{ entry.end }}')">Löschen</button>
                 </div>
                 {% endfor %}
             </div>
             <input type="hidden" id="scheduleEntries" name="schedule_entries" value="{{ schedule|tojson|forceescape }}">
-            <button type="submit">Zeitplan speichern</button>
+            <button type="submit">Speichern</button>
         </form>
     </div>
 
+    <!-- Kalibrierung -->
+    <div class="card">
+        <h2>EC-Kalibrierung</h2>
+        <div class="time-inputs">
+            <input type="number" step="0.1" id="raw1" placeholder="Rohwert 1">
+            <input type="number" step="0.1" id="ec1" placeholder="EC-Wert 1">
+            <input type="number" step="0.1" id="raw2" placeholder="Rohwert 2">
+            <input type="number" step="0.1" id="ec2" placeholder="EC-Wert 2">
+            <button type="button" onclick="calibrate()">Kalibrieren</button>
+        </div>
+    </div>
+
     <script>
-        // Funktion zum Hinzufügen von Zeitintervallen
-        function addSchedule() {
-            const startTime = document.getElementById('startTime');
-            const endTime = document.getElementById('endTime');
-            const scheduleList = document.getElementById('scheduleList');
-            const scheduleEntries = document.getElementById('scheduleEntries');
-
-            if (startTime.value && endTime.value) {
-                // Neuen Eintrag erstellen
-                const newEntry = { start: startTime.value, end: endTime.value };
-
-                // Eintrag zur Liste hinzufügen
-                const newItem = document.createElement('div');
-                newItem.className = 'schedule-item';
-                newItem.innerHTML = `
-                    <span>${newEntry.start} - ${newEntry.end}</span>
-                    <button type="button" onclick="removeSchedule('${newEntry.start}', '${newEntry.end}')">Löschen</button>
-                `;
-                scheduleList.appendChild(newItem);
-
-                // Eintrag zum versteckten Eingabefeld hinzufügen
-                let entries = [];
-                if (scheduleEntries.value) {
-                    entries = JSON.parse(scheduleEntries.value);
-                }
-                entries.push(newEntry);
-                scheduleEntries.value = JSON.stringify(entries);
-
-                // Eingabefelder leeren
-                startTime.value = '';
-                endTime.value = '';
-            }
-        }
-
-        // Funktion zum Entfernen von Zeitintervallen
-        function removeSchedule(start, end) {
-            const scheduleEntries = document.getElementById('scheduleEntries');
-            let entries = JSON.parse(scheduleEntries.value);
-
-            // Eintrag entfernen
-            entries = entries.filter(entry => entry.start !== start || entry.end !== end);
-            scheduleEntries.value = JSON.stringify(entries);
-
-            // Liste neu aufbauen
-            const scheduleList = document.getElementById('scheduleList');
-            scheduleList.innerHTML = '';
-            entries.forEach(entry => {
-                const newItem = document.createElement('div');
-                newItem.className = 'schedule-item';
-                newItem.innerHTML = `
-                    <span>${entry.start} - ${entry.end}</span>
-                    <button type="button" onclick="removeSchedule('${entry.start}', '${entry.end}')">Löschen</button>
-                `;
-                scheduleList.appendChild(newItem);
-            });
-        }
-
-        // Funktion zum Aktualisieren der Sensordaten
+        // Live-Datenaktualisierung
         function updateSensorData() {
             fetch("/get_sensor_data")
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById("currentTemp").textContent = data.temp;
-                    document.getElementById("currentEC").textContent = data.ec;
+                    document.getElementById("currentTemp").textContent = data.temp.toFixed(1);
+                    document.getElementById("currentEC").textContent = data.ec.toFixed(2);
                 });
         }
+        setInterval(updateSensorData, 1000);
 
-        // Sensordaten alle 5 Sekunden aktualisieren
-        setInterval(updateSensorData, 5000);
+        // Zeitplan
+        function addSchedule() {
+            const start = document.getElementById("startTime").value;
+            const end = document.getElementById("endTime").value;
+            if (!start || !end) return;
+
+            const entry = { start, end };
+            const schedule = JSON.parse(document.getElementById("scheduleEntries").value || "[]");
+            schedule.push(entry);
+            document.getElementById("scheduleEntries").value = JSON.stringify(schedule);
+            
+            const div = document.createElement("div");
+            div.className = "schedule-item";
+            div.innerHTML = `${start} - ${end} <button onclick="this.parentElement.remove()">Löschen</button>`;
+            document.getElementById("scheduleList").appendChild(div);
+        }
+
+        // Kalibrierung
+        function calibrate() {
+            const data = new URLSearchParams();
+            data.append("raw1", document.getElementById("raw1").value);
+            data.append("ec1", document.getElementById("ec1").value);
+            data.append("raw2", document.getElementById("raw2").value);
+            data.append("ec2", document.getElementById("ec2").value);
+
+            fetch("/calibrate_ec", { method: "POST", body: data })
+                .then(response => response.json())
+                .then(data => alert(data.success ? "Kalibrierung erfolgreich!" : "Fehler: " + data.error));
+        }
     </script>
 </body>
 </html>
