@@ -1,50 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sensor Dashboard</title>
-    <script>
-        // Funktion zum Abrufen der aktuellen Daten
-        async function fetchSensorData() {
-            try {
-                const response = await fetch('/data');
-                const data = await response.json();
-
-                // Sensordaten im HTML aktualisieren
-                document.getElementById('ec-value').textContent = data.ec.toFixed(2) + ' mS/cm';
-                document.getElementById('ph-value').textContent = data.ph.toFixed(2);
-                document.getElementById('temperature-value').textContent = data.temperature.toFixed(2) + ' °C';
-                document.getElementById('water-level-value').textContent = data.water_level.toFixed(2) + ' %';
-            } catch (error) {
-                console.error('Fehler beim Abrufen der Sensordaten:', error);
-            }
-        }
-
-        // Aktualisierung alle 5 Sekunden
-        setInterval(fetchSensorData, 5000);
-
-        // Daten beim Laden der Seite abrufen
-        window.onload = fetchSensorData;
-    </script>
+    <title>Nährstoffdosierer</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .card { background: #f0f0f0; padding: 20px; margin: 10px; border-radius: 10px; }
+        input[type="number"], input[type="time"] { padding: 5px; margin: 5px; }
+        button { background: #4CAF50; color: white; border: none; padding: 10px; cursor: pointer; }
+    </style>
 </head>
 <body>
-    <h1>Sensor Dashboard</h1>
-    <div>
-        <p><strong>EC-Wert:</strong> <span id="ec-value">Laden...</span></p>
-        <p><strong>pH-Wert:</strong> <span id="ph-value">Laden...</span></p>
-        <p><strong>Temperatur:</strong> <span id="temperature-value">Laden...</span></p>
-        <p><strong>Wasserstand:</strong> <span id="water-level-value">Laden...</span></p>
+    <h1>Nährstoffdosierer Steuerung</h1>
+    
+    <div class="card">
+        <h2>Aktuelle Daten</h2>
+        <p>Temperatur: {{ temp }} °C</p>
+        <p>EC-Wert: {{ ec }}</p>
     </div>
-    <form method="POST" action="/update">
-        <h2>Werte anpassen</h2>
-        <label>EC-Wert:</label>
-        <input type="number" step="0.1" name="ec" placeholder="Neuer EC-Wert"><br>
-        <label>pH-Wert:</label>
-        <input type="number" step="0.1" name="ph" placeholder="Neuer pH-Wert"><br>
-        <label>Wasserstand:</label>
-        <input type="number" step="0.1" name="water_level" placeholder="Neuer Wasserstand"><br>
-        <button type="submit">Aktualisieren</button>
-    </form>
+
+    <div class="card">
+        <h2>Ziel-EC einstellen</h2>
+        <form action="/set_ec" method="post">
+            <input type="number" step="0.1" name="target_ec" value="{{ target_ec }}">
+            <button type="submit">Speichern</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Bewässerungszeitplan</h2>
+        <form action="/set_schedule" method="post">
+            <input type="time" name="schedule_time" multiple>
+            <button type="submit">Zeitplan hinzufügen</button>
+        </form>
+    </div>
 </body>
 </html>
