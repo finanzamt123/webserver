@@ -13,7 +13,7 @@ PUMP_DOSER = 18       # Dosierpumpe
 current_temp = 25.0
 current_ec = 1.2
 target_ec = 1.5
-schedule = []
+schedule = []  # Liste der Bewässerungszeiten
 
 # GPIO initialisieren
 GPIO.setmode(GPIO.BCM)
@@ -39,7 +39,7 @@ def control_pumps():
 
 @app.route("/")
 def index():
-    return render_template("index.html", temp=current_temp, ec=current_ec, target_ec=target_ec)
+    return render_template("index.html", temp=current_temp, ec=current_ec, target_ec=target_ec, schedule=schedule)
 
 @app.route("/data", methods=["POST"])
 def data():
@@ -57,7 +57,11 @@ def set_ec():
 @app.route("/set_schedule", methods=["POST"])
 def set_schedule():
     global schedule
-    schedule = request.form.getlist("schedule_time")
+    schedule_times = request.form.get("schedule_times")
+    if schedule_times:
+        schedule = schedule_times.split(',')
+    else:
+        schedule = []
     return "Zeitplan aktualisiert"
 
 if __name__ == "__main__":
