@@ -3,106 +3,102 @@
 <head>
     <title>Nährstoffdosierer</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
+        body { font-family: Arial; margin: 20px; }
         .card { background: #f0f0f0; padding: 20px; margin: 10px; border-radius: 10px; }
-        button { background: #4CAF50; color: white; border: none; padding: 10px; cursor: pointer; }
-        .schedule-item { background: #e0e0e0; padding: 10px; margin: 5px; border-radius: 5px; }
-        .time-inputs { display: flex; gap: 10px; margin: 10px 0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        #graph { width: 100%; height: 300px; }
     </style>
 </head>
 <body>
     <h1>Nährstoffdosierer Steuerung</h1>
+    
+    <div class="grid">
+        <div class="card">
+            <h2>Live-Daten</h2>
+            <p>Temperatur: <span id="temp">-</span> °C</p>
+            <p>EC-Wert: <span id="ec">-</span></p>
+        </div>
 
-    <!-- Sensordaten -->
-    <div class="card">
-        <h2>Aktuelle Daten</h2>
-        <p>Temperatur: <span id="currentTemp">{{ temp }}</span> °C</p>
-        <p>EC-Wert: <span id="currentEC">{{ ec }}</span></p>
-    </div>
+        <div class="card">
+            <h2>Steuerung</h2>
+            <label>Ziel-EC: <input type="number" id="targetEc" step="0.1"></label>
+            <button onclick="updateTargetEc()">Speichern</button>
+        </div>
 
-    <!-- Ziel-EC -->
-    <div class="card">
-        <h2>Ziel-EC</h2>
-        <form action="/set_ec" method="post">
-            <input type="number" step="0.1" name="target_ec" value="{{ target_ec }}">
-            <button type="submit">Speichern</button>
-        </form>
-    </div>
-
-    <!-- Zeitplan -->
-    <div class="card">
-        <h2>Bewässerungszeitplan</h2>
-        <form id="scheduleForm" action="/set_schedule" method="post">
-            <div class="time-inputs">
-                <input type="time" id="startTime" required>
-                <input type="time" id="endTime" required>
-                <button type="button" onclick="addSchedule()">Hinzufügen</button>
-            </div>
-            <div id="scheduleList">
-                {% for entry in schedule %}
-                <div class="schedule-item">
-                    {{ entry.start }} - {{ entry.end }}
-                    <button type="button" onclick="removeSchedule('{{ entry.start }}', '{{ entry.end }}')">Löschen</button>
+        <div class="card">
+            <h2>Zeitplan</h2>
+            <div id="schedule">
+                <div class="time-entry">
+                    <input type="time" class="start">
+                    <input type="time" class="end">
+                    <button onclick="addTimeSlot(this)">+</button>
                 </div>
-                {% endfor %}
             </div>
-            <input type="hidden" id="scheduleEntries" name="schedule_entries" value="{{ schedule|tojson|forceescape }}">
-            <button type="submit">Speichern</button>
-        </form>
-    </div>
+            <button onclick="saveSchedule()">Zeitplan speichern</button>
+        </div>
 
-    <!-- Kalibrierung -->
-    <div class="card">
-        <h2>EC-Kalibrierung</h2>
-        <div class="time-inputs">
-            <input type="number" step="0.1" id="raw1" placeholder="Rohwert 1">
-            <input type="number" step="0.1" id="ec1" placeholder="EC-Wert 1">
-            <input type="number" step="0.1" id="raw2" placeholder="Rohwert 2">
-            <input type="number" step="0.1" id="ec2" placeholder="EC-Wert 2">
-            <button type="button" onclick="calibrate()">Kalibrieren</button>
+        <div class="card">
+            <h2>Kalibrierung</h2>
+            <label>Rohwert 1: <input type="number" id="raw1"></label>
+            <label>EC 1: <input type="number" id="ec1" step="0.1"></label><br>
+            <label>Rohwert 2: <input type="number" id="raw2"></label>
+            <label>EC 2: <input type="number" id="ec2" step="0.1"></label><br>
+            <button onclick="calibrate()">Kalibrieren</button>
         </div>
     </div>
 
+    <div class="card">
+        <h2>Datenverlauf (24h)</h2>
+        <img id="graph" src="/graph">
+    </div>
+
     <script>
-        // Live-Datenaktualisierung
-        function updateSensorData() {
-            fetch("/get_sensor_data")
-                .then(response => response.json())
+        // Live-Daten aktualisieren
+        function updateData() {
+            fetch("/get_data")
+                .then(r => r.json())
                 .then(data => {
-                    document.getElementById("currentTemp").textContent = data.temp.toFixed(1);
-                    document.getElementById("currentEC").textContent = data.ec.toFixed(2);
+                    document.getElementById("temp").textContent = data.temp.toFixed(1);
+                    document.getElementById("ec").textContent = data.ec.toFixed(2);
+                    document.getElementById("targetEc").value = data.target_ec;
                 });
         }
-        setInterval(updateSensorData, 1000);
+        setInterval(updateData, 1000);
 
-        // Zeitplan
-        function addSchedule() {
-            const start = document.getElementById("startTime").value;
-            const end = document.getElementById("endTime").value;
-            if (!start || !end) return;
+        // Graph aktualisieren
+        setInterval(() => document.getElementById("graph").src = "/graph?" + Date.now(), 300000);
 
-            const entry = { start, end };
-            const schedule = JSON.parse(document.getElementById("scheduleEntries").value || "[]");
-            schedule.push(entry);
-            document.getElementById("scheduleEntries").value = JSON.stringify(schedule);
-            
-            const div = document.createElement("div");
-            div.className = "schedule-item";
-            div.innerHTML = `${start} - ${end} <button onclick="this.parentElement.remove()">Löschen</button>`;
-            document.getElementById("scheduleList").appendChild(div);
+        // Steuerungsfunktionen
+        function updateTargetEc() {
+            fetch("/update_target", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({target_ec: parseFloat(document.getElementById("targetEc").value)})
+            });
         }
 
-        // Kalibrierung
         function calibrate() {
-            const data = new URLSearchParams();
-            data.append("raw1", document.getElementById("raw1").value);
-            data.append("ec1", document.getElementById("ec1").value);
-            data.append("raw2", document.getElementById("raw2").value);
-            data.append("ec2", document.getElementById("ec2").value);
+            const data = {
+                raw1: parseFloat(document.getElementById("raw1").value),
+                ec1: parseFloat(document.getElementById("ec1").value),
+                raw2: parseFloat(document.getElementById("raw2").value),
+                ec2: parseFloat(document.getElementById("ec2").value)
+            };
+            fetch("/calibrate", {method: "POST", body: JSON.stringify(data)});
+        }
 
-            fetch("/calibrate_ec", { method: "POST", body: data })
-                .then(response => response.json())
-                .then(data => alert(data.success ? "Kalibrierung erfolgreich!" : "Fehler: " + data.error));
+        function addTimeSlot(btn) {
+            const clone = btn.parentElement.cloneNode(true);
+            clone.querySelector("button").onclick = () => clone.remove();
+            document.getElementById("schedule").appendChild(clone);
+        }
+
+        function saveSchedule() {
+            const slots = Array.from(document.querySelectorAll(".time-entry")).map(entry => ({
+                start: entry.querySelector(".start").value,
+                end: entry.querySelector(".end").value
+            }));
+            fetch("/schedule", {method: "POST", body: JSON.stringify(slots)});
         }
     </script>
 </body>
