@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import RPi.GPIO as GPIO
 from threading import Thread
 import time
@@ -50,6 +50,10 @@ def data():
     current_temp = float(request.form.get("temp"))
     current_ec = float(request.form.get("ec"))
     return "OK"
+
+@app.route("/get_sensor_data")
+def get_sensor_data():
+    return jsonify(temp=current_temp, ec=current_ec)
 
 @app.route("/set_ec", methods=["POST"])
 def set_ec():
