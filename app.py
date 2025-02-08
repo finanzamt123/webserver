@@ -2,6 +2,7 @@ from flask import Flask, render_template, request
 import RPi.GPIO as GPIO
 from threading import Thread
 import time
+import json
 
 app = Flask(__name__)
 
@@ -13,7 +14,7 @@ PUMP_DOSER = 18       # Dosierpumpe
 current_temp = 25.0
 current_ec = 1.2
 target_ec = 1.5
-schedule = []  # Liste der Bewässerungszeiten
+schedule = []  # Liste der Bewässerungszeiten (als Dictionary: {'start': 'HH:MM', 'end': 'HH:MM'})
 
 # GPIO initialisieren
 GPIO.setmode(GPIO.BCM)
@@ -30,8 +31,10 @@ def control_pumps():
 
         # Zeitplan für Bewässerung
         current_time = time.strftime("%H:%M")
-        if current_time in schedule:
-            GPIO.output(PUMP_IRRIGATION, GPIO.HIGH)
+        for entry in schedule:
+            if entry['start'] <= current_time <= entry['end']:
+                GPIO.output(PUMP_IRRIGATION, GPIO.HIGH)
+                break
         else:
             GPIO.output(PUMP_IRRIGATION, GPIO.LOW)
 
@@ -57,9 +60,9 @@ def set_ec():
 @app.route("/set_schedule", methods=["POST"])
 def set_schedule():
     global schedule
-    schedule_times = request.form.get("schedule_times")
-    if schedule_times:
-        schedule = schedule_times.split(',')
+    schedule_entries = request.form.get("schedule_entries")
+    if schedule_entries:
+        schedule = json.loads(schedule_entries)
     else:
         schedule = []
     return "Zeitplan aktualisiert"
