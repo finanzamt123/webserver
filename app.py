@@ -1,71 +1,65 @@
-from flask import Flask, render_template, request, jsonify
-import glob
+from flask import Flask, render_template, request
+import RPi.GPIO as GPIO
+from threading import Thread
 import time
 
 app = Flask(__name__)
 
-# DS18B20 Initialisierung
-base_dir = '/sys/bus/w1/devices/'
-device_folder = glob.glob(base_dir + '28-*')[0]
-device_file = device_folder + '/w1_slave'
+# GPIO-Pins
+PUMP_IRRIGATION = 17  # Bewässerungspumpe
+PUMP_DOSER = 18       # Dosierpumpe
 
-# Sensordaten und Zielwerte
-data = {
-    "ec": 1.2,  # Beispielwert für elektrische Leitfähigkeit
-    "ph": 7.0,  # Beispielwert für pH
-    "temperature": 25.0,  # Standardtemperatur, wird überschrieben
-    "water_level": 50.0  # Beispielwert für Wasserstand
-}
+# Globale Variablen
+current_temp = 25.0
+current_ec = 1.2
+target_ec = 1.5
+schedule = []
 
+# GPIO initialisieren
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(PUMP_IRRIGATION, GPIO.OUT)
+GPIO.setup(PUMP_DOSER, GPIO.OUT)
 
-def read_temp():
-    """
-    Liest die Temperatur vom DS18B20-Sensor aus.
-    """
-    with open(device_file, 'r') as f:
-        lines = f.readlines()
-    while lines[0].strip()[-3:] != 'YES':
-        time.sleep(0.2)
-        lines = f.readlines()
-    temp_pos = lines[1].find('t=')
-    if temp_pos != -1:
-        temp_c = float(lines[1][temp_pos + 2:]) / 1000.0
-        return temp_c
-    return None
+def control_pumps():
+    while True:
+        # EC-Korrektur
+        if current_ec < target_ec:
+            GPIO.output(PUMP_DOSER, GPIO.HIGH)
+        else:
+            GPIO.output(PUMP_DOSER, GPIO.LOW)
 
+        # Zeitplan für Bewässerung
+        current_time = time.strftime("%H:%M")
+        if current_time in schedule:
+            GPIO.output(PUMP_IRRIGATION, GPIO.HIGH)
+        else:
+            GPIO.output(PUMP_IRRIGATION, GPIO.LOW)
+
+        time.sleep(10)
 
 @app.route("/")
 def index():
-    """
-    Startseite mit Anzeige der aktuellen Werte.
-    """
-    return render_template("index.html")
+    return render_template("index.html", temp=current_temp, ec=current_ec, target_ec=target_ec)
 
+@app.route("/data", methods=["POST"])
+def data():
+    global current_temp, current_ec
+    current_temp = float(request.form.get("temp"))
+    current_ec = float(request.form.get("ec"))
+    return "OK"
 
-@app.route("/data")
-def get_data():
-    """
-    API-Route, die die aktuellen Werte als JSON zurückgibt.
-    """
-    # Aktualisiere die Temperatur mit dem DS18B20-Wert
-    data["temperature"] = read_temp()
-    return jsonify(data)
+@app.route("/set_ec", methods=["POST"])
+def set_ec():
+    global target_ec
+    target_ec = float(request.form.get("target_ec"))
+    return "EC aktualisiert"
 
-
-@app.route("/update", methods=["POST"])
-def update():
-    """
-    Aktualisiert die Zielwerte für EC, pH und Wasserstand.
-    """
-    try:
-        data["ec"] = float(request.form.get("ec", data["ec"]))
-        data["ph"] = float(request.form.get("ph", data["ph"]))
-        data["water_level"] = float(request.form.get("water_level", data["water_level"]))
-    except ValueError:
-        # Falls fehlerhafte Werte übermittelt werden, bleiben die alten Werte erhalten.
-        pass
-    return "Werte aktualisiert!", 200
-
+@app.route("/set_schedule", methods=["POST"])
+def set_schedule():
+    global schedule
+    schedule = request.form.getlist("schedule_time")
+    return "Zeitplan aktualisiert"
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    Thread(target=control_pumps).start()
+    app.run(host="0.0.0.0", port=5000)
